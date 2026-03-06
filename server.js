@@ -43,9 +43,9 @@ class AwsCredentialConfigError extends Error {
 }
 
 function getAwsCredentialConfig() {
-    const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
-    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
-    const sessionToken = process.env.AWS_SESSION_TOKEN?.trim();
+    const accessKeyId = process.env.BEDROCK_AWS_ACCESS_KEY_ID?.trim();
+    const secretAccessKey = process.env.BEDROCK_AWS_SECRET_ACCESS_KEY?.trim();
+    const sessionToken = process.env.BEDROCK_AWS_SESSION_TOKEN?.trim();
 
     if (!accessKeyId && !secretAccessKey && !sessionToken) {
         return { credentials: null, source: 'default-provider', hasSessionToken: false };
@@ -53,19 +53,19 @@ function getAwsCredentialConfig() {
 
     if (!accessKeyId || !secretAccessKey) {
         throw new AwsCredentialConfigError(
-            'Incomplete AWS credentials in .env. Set both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or remove both to use the default AWS credential chain.',
+            'Incomplete AWS credentials in .env. Set both BEDROCK_AWS_ACCESS_KEY_ID and BEDROCK_AWS_SECRET_ACCESS_KEY, or remove both to use the default AWS credential chain.',
         );
     }
 
     if (accessKeyId === secretAccessKey) {
         throw new AwsCredentialConfigError(
-            'Invalid AWS credentials in .env. AWS_SECRET_ACCESS_KEY is currently set to the access key ID. Replace it with the real secret access key.',
+            'Invalid AWS credentials in .env. BEDROCK_AWS_SECRET_ACCESS_KEY is currently set to the access key ID. Replace it with the real secret access key.',
         );
     }
 
     if (accessKeyId.startsWith('ASIA') && !sessionToken) {
         throw new AwsCredentialConfigError(
-            'Temporary AWS credentials require AWS_SESSION_TOKEN. Add AWS_SESSION_TOKEN to .env or use long-lived IAM user credentials.',
+            'Temporary AWS credentials require BEDROCK_AWS_SESSION_TOKEN. Add BEDROCK_AWS_SESSION_TOKEN to .env or use long-lived IAM user credentials.',
         );
     }
 
@@ -82,22 +82,22 @@ function getAwsCredentialConfig() {
 }
 
 function getAwsSigningErrorMessage() {
-    const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
-    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
-    const sessionToken = process.env.AWS_SESSION_TOKEN?.trim();
+    const accessKeyId = process.env.BEDROCK_AWS_ACCESS_KEY_ID?.trim();
+    const secretAccessKey = process.env.BEDROCK_AWS_SECRET_ACCESS_KEY?.trim();
+    const sessionToken = process.env.BEDROCK_AWS_SESSION_TOKEN?.trim();
 
     if (accessKeyId && secretAccessKey && accessKeyId === secretAccessKey) {
-        return 'AWS signature mismatch: AWS_SECRET_ACCESS_KEY in .env is set to the access key ID. Replace it with the real secret access key.';
+        return 'AWS signature mismatch: BEDROCK_AWS_SECRET_ACCESS_KEY in .env is set to the access key ID. Replace it with the real secret access key.';
     }
 
     if (accessKeyId?.startsWith('ASIA') && !sessionToken) {
-        return 'AWS signature mismatch: temporary AWS credentials require AWS_SESSION_TOKEN.';
+        return 'AWS signature mismatch: temporary AWS credentials require BEDROCK_AWS_SESSION_TOKEN.';
     }
 
-    return 'AWS request signing failed. Check AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN in .env.';
+    return 'AWS request signing failed. Check BEDROCK_AWS_SECRET_ACCESS_KEY and BEDROCK_AWS_SESSION_TOKEN in .env.';
 }
 function getBedrockClient(region) {
-    const r = region || process.env.AWS_REGION || 'us-east-1';
+    const r = region || process.env.BEDROCK_AWS_REGION || 'us-east-1';
     if (!bedrockClients[r]) {
         const { credentials } = getAwsCredentialConfig();
         const clientConfig = { region: r };
@@ -111,9 +111,9 @@ function getBedrockClient(region) {
 
 // ── AWS Startup Validation ──
 function validateAwsCredentials() {
-    const hasAccessKey = !!process.env.AWS_ACCESS_KEY_ID;
-    const hasSecretKey = !!process.env.AWS_SECRET_ACCESS_KEY;
-    const region = process.env.AWS_REGION || 'us-east-1';
+    const hasAccessKey = !!process.env.BEDROCK_AWS_ACCESS_KEY_ID;
+    const hasSecretKey = !!process.env.BEDROCK_AWS_SECRET_ACCESS_KEY;
+    const region = process.env.BEDROCK_AWS_REGION || 'us-east-1';
 
     if (hasAccessKey && hasSecretKey) {
         console.log('✅ AWS Credentials loaded. Bedrock API is ready.');
@@ -127,13 +127,13 @@ function validateAwsCredentials() {
         }
     } else {
         console.warn('⚠️ WARNING: Missing AWS credentials in .env');
-        if (!hasAccessKey) console.warn('   - AWS_ACCESS_KEY_ID is missing');
-        if (!hasSecretKey) console.warn('   - AWS_SECRET_ACCESS_KEY is missing');
+        if (!hasAccessKey) console.warn('   - BEDROCK_AWS_ACCESS_KEY_ID is missing');
+        if (!hasSecretKey) console.warn('   - BEDROCK_AWS_SECRET_ACCESS_KEY is missing');
     }
 }
 
 function validateAwsCredentialConfig() {
-    const region = process.env.AWS_REGION || 'us-east-1';
+    const region = process.env.BEDROCK_AWS_REGION || 'us-east-1';
 
     try {
         const { source, hasSessionToken } = getAwsCredentialConfig();
@@ -720,7 +720,7 @@ async function streamBedrock({ req, res, messages, modelId, params = {}, region 
                 errorMsg =
                     'This model must be invoked through an inference profile. Use the "us." prefixed Bedrock profile ID for cross-region models, or switch to a supported AWS region for regional-only models.';
             } else if (error.message?.includes('provided model identifier is invalid')) {
-                errorMsg = `Model "${modelId}" is not a valid Bedrock model ID in region ${region || process.env.AWS_REGION || 'us-east-1'}.`;
+                errorMsg = `Model "${modelId}" is not a valid Bedrock model ID in region ${region || process.env.BEDROCK_AWS_REGION || 'us-east-1'}.`;
             } else {
                 errorMsg = error.message || 'Invalid model ID or parameters.';
             }
@@ -729,13 +729,13 @@ async function streamBedrock({ req, res, messages, modelId, params = {}, region 
             errorMsg = 'Model took too long to respond. Try a smaller prompt or a faster model.';
         } else if (error.name === 'UnrecognizedClientException') {
             code = 401;
-            errorMsg = 'AWS credentials are invalid. Check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.';
+            errorMsg = 'AWS credentials are invalid. Check your BEDROCK_AWS_ACCESS_KEY_ID and BEDROCK_AWS_SECRET_ACCESS_KEY.';
         } else if (error.name === 'ExpiredTokenException') {
             code = 401;
             errorMsg = 'AWS credentials have expired. Please refresh your credentials.';
         } else if (error.name === 'CredentialsProviderError') {
             code = 401;
-            errorMsg = 'AWS credentials could not be resolved. Set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in .env or configure the default AWS credential chain.';
+            errorMsg = 'AWS credentials could not be resolved. Set BEDROCK_AWS_ACCESS_KEY_ID/BEDROCK_AWS_SECRET_ACCESS_KEY in .env or configure the default AWS credential chain.';
         } else if (error.name === 'AwsCredentialConfigError') {
             code = 500;
             errorMsg = error.message;
