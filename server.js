@@ -1198,4 +1198,4 @@ if (process.env.NODE_ENV !== 'production' && !process.env.NETLIFY) {
     });
 }
 
-export { app };
+export { app, streamNvidia, streamGoogle, streamBedrock, streamOpenRouter };

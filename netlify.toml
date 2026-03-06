@@ -5,7 +5,14 @@
 [functions]
   node_bundler = "esbuild"
 
-# Proxy /api to Netlify function
+# Route /api/chat natively to avoid serverless-http buffering our chat stream
+[[redirects]]
+  from = "/api/chat"
+  to = "/.netlify/functions/chat"
+  status = 200
+  force = true
+
+# Proxy all other /api routes to Express app wrapper
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
