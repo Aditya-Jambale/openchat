@@ -173,10 +173,11 @@ export async function sendMessage(text, imageFile = null) {
     }
 
     const apiKey = getApiKey();
-    if (!apiKey) {
-        showToast('Please set your API key first.', 'warning');
-        return;
-    }
+    // Allow empty API key since we're deployed and the server has the keys
+    // if (!apiKey) {
+    //     showToast('Please set your API key first.', 'warning');
+    //     return;
+    // }
 
     // Initialize chat if it has no messages yet
     if (!currentChat) {
