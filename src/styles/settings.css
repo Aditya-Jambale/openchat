@@ -1,0 +1,383 @@
+/* ═══════════════════════════════════════════════
+   Settings Drawer — Right-side slide-in panel
+   ═══════════════════════════════════════════════ */
+
+/* ── Backdrop ── */
+.settings-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 900;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.settings-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ── Drawer ── */
+.settings-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 380px;
+    max-width: 90vw;
+    background: var(--glass-bg, rgba(18, 18, 28, 0.96));
+    border-left: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+    z-index: 950;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.settings-drawer.open {
+    transform: translateX(0);
+}
+
+/* ── Header ── */
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-header h2 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary, #e8e6e3);
+    margin: 0;
+}
+
+.btn-close-settings {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #8a8a8d);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.btn-close-settings:hover {
+    color: var(--text-primary, #e8e6e3);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Body ── */
+.settings-body {
+    padding: 16px 24px 24px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* ── Section ── */
+.settings-section {
+    margin-bottom: 24px;
+}
+
+.settings-section-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary, #8a8a8d);
+    margin: 0 0 12px;
+}
+
+/* ── Slider Control ── */
+.setting-control {
+    margin-bottom: 18px;
+}
+
+.setting-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.setting-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    color: var(--text-primary, #e8e6e3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.setting-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent, #d4a74a);
+    min-width: 3ch;
+    text-align: right;
+}
+
+.setting-tooltip {
+    position: relative;
+    cursor: help;
+    color: var(--text-secondary, #8a8a8d);
+    font-size: 0.75rem;
+}
+
+.setting-tooltip::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: #ddd;
+    font-size: 0.72rem;
+    font-weight: 400;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: normal;
+    width: max-content;
+    max-width: 220px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 1000;
+    line-height: 1.4;
+}
+
+.setting-tooltip:hover::after {
+    opacity: 1;
+}
+
+/* ── Range Slider ── */
+.setting-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    cursor: pointer;
+}
+
+.setting-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent, #d4a74a);
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+}
+
+.setting-slider::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 4px rgba(212, 167, 74, 0.2);
+}
+
+.setting-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent, #d4a74a);
+    border: none;
+    cursor: pointer;
+}
+
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    color: var(--text-secondary, #8a8a8d);
+    margin-top: 4px;
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Max Tokens Buttons ── */
+.max-tokens-group {
+    display: flex;
+    gap: 6px;
+}
+
+.max-token-btn {
+    flex: 1;
+    padding: 6px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary, #8a8a8d);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.max-token-btn:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary, #e8e6e3);
+}
+
+.max-token-btn.active {
+    background: rgba(212, 167, 74, 0.15);
+    border-color: var(--accent, #d4a74a);
+    color: var(--accent, #d4a74a);
+}
+
+/* ── Presets Row ── */
+.preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.preset-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text-secondary, #8a8a8d);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.preset-btn:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary, #e8e6e3);
+}
+
+.preset-btn.active {
+    background: rgba(212, 167, 74, 0.15);
+    border-color: var(--accent, #d4a74a);
+    color: var(--accent, #d4a74a);
+}
+
+/* ── Advanced Toggle ── */
+.advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--text-secondary, #8a8a8d);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 4px 0;
+    margin-bottom: 12px;
+    transition: color 0.15s;
+}
+
+.advanced-toggle:hover {
+    color: var(--text-primary, #e8e6e3);
+}
+
+.advanced-toggle .chevron {
+    transition: transform 0.2s ease;
+    font-size: 0.65rem;
+}
+
+.advanced-toggle .chevron.expanded {
+    transform: rotate(90deg);
+}
+
+.advanced-content {
+    display: none;
+}
+
+.advanced-content.visible {
+    display: block;
+}
+
+/* ── System Prompt ── */
+.prompt-preset-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary, #e8e6e3);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.83rem;
+    outline: none;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: border-color 0.15s;
+}
+
+.prompt-preset-select:focus {
+    border-color: rgba(212, 167, 74, 0.4);
+}
+
+.prompt-preset-select option {
+    background: #1a1a2e;
+    color: #e8e6e3;
+}
+
+.system-prompt-textarea {
+    width: 100%;
+    min-height: 100px;
+    max-height: 200px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary, #e8e6e3);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.83rem;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.system-prompt-textarea:focus {
+    border-color: rgba(212, 167, 74, 0.4);
+}
+
+.system-prompt-textarea::placeholder {
+    color: var(--text-secondary, #8a8a8d);
+    opacity: 0.6;
+}
+
+/* ── Settings Gear Button ── */
+.btn-settings-gear {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-secondary, #8a8a8d);
+    cursor: pointer;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-end;
+    margin-top: 14px;
+    transition: all 0.15s ease;
+}
+
+.btn-settings-gear:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary, #e8e6e3);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+    .settings-drawer {
+        width: 100vw;
+        max-width: 100vw;
+    }
+}

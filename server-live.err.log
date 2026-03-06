@@ -1,0 +1,9 @@
+[bedrock] Error: ValidationException The provided model identifier is invalid.
+[bedrock] Error: ValidationException The provided model identifier is invalid.
+[bedrock] Error: ValidationException The provided model identifier is invalid.
+[bedrock] Error: ValidationException The provided model identifier is invalid.
+[bedrock] Error: ResourceNotFoundException Access denied. This Model is marked by provider as Legacy and you have not been actively using the model in the last 15 days. Please upgrade to an active model on Amazon Bedrock
+[bedrock] Error: ValidationException The provided model identifier is invalid.
+[bedrock] Error: ValidationException The provided model identifier is invalid.
+[bedrock] Error: ValidationException The provided model identifier is invalid.
+[bedrock] Error: AccessDeniedException Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cannot be completed at this time. If you recently fixed this issue, try again after 2 minutes.

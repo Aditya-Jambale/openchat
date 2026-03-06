@@ -1,0 +1,5 @@
+AWS credential configuration error: Invalid AWS credentials in .env. AWS_SECRET_ACCESS_KEY is currently set to the access key ID. Replace it with the real secret access key.
+[bedrock] Error: AwsCredentialConfigError Invalid AWS credentials in .env. AWS_SECRET_ACCESS_KEY is currently set to the access key ID. Replace it with the real secret access key.
+[bedrock] Error: AwsCredentialConfigError Invalid AWS credentials in .env. AWS_SECRET_ACCESS_KEY is currently set to the access key ID. Replace it with the real secret access key.
+[bedrock] Error: AwsCredentialConfigError Invalid AWS credentials in .env. AWS_SECRET_ACCESS_KEY is currently set to the access key ID. Replace it with the real secret access key.
+[bedrock] Error: AwsCredentialConfigError Invalid AWS credentials in .env. AWS_SECRET_ACCESS_KEY is currently set to the access key ID. Replace it with the real secret access key.
