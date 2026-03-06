@@ -97,40 +97,6 @@ async function refreshWelcomeHints() {
 }
 
 async function init() {
-    // ── Password Protection ──
-    const passwordOverlay = document.getElementById('site-password-overlay');
-    const passwordInput = document.getElementById('site-password-input');
-    const btnSubmitPassword = document.getElementById('btn-submit-password');
-    const passwordError = document.getElementById('site-password-error');
-
-    if (passwordOverlay && passwordInput && btnSubmitPassword) {
-        // Prevent scrolling while overlay is active
-        document.body.style.overflow = 'hidden';
-
-        function checkPassword() {
-            if (passwordInput.value === 'NerdOpen') {
-                passwordOverlay.classList.add('hidden');
-                document.body.style.overflow = ''; // Restore scrolling
-            } else {
-                passwordError.classList.remove('hidden');
-                passwordInput.select();
-                passwordInput.focus();
-            }
-        }
-
-        btnSubmitPassword.addEventListener('click', checkPassword);
-        passwordInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                checkPassword();
-            }
-        });
-
-        // Ensure input is focused quickly
-        setTimeout(() => passwordInput.focus(), 100);
-    }
-    // ─────────────────────────
-
     const models = await loadAvailableModels();
     const modelsByKey = new Map(models.map((model) => [model.key, model]));
 
