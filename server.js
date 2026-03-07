@@ -1416,9 +1416,6 @@ const PREFERRED_GITHUB_MODEL_IDS = new Set([
     'meta/llama-3.3-70b-instruct',
     'meta/meta-llama-3.1-8b-instruct',
     'meta/llama-4-maverick-17b-128e-instruct-fp8',
-    'mistral-ai/mistral-medium-2505',
-    'mistral-ai/mistral-small-2503',
-    'mistral-ai/codestral-2501',
     'microsoft/phi-4-multimodal-instruct',
 ]);
 
