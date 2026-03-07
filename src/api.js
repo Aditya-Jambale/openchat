@@ -41,7 +41,7 @@ export async function fetchGitHubModels() {
  * @param {Array} requestData.messages - conversation messages [{role, content}]
  * @param {string} requestData.apiKey - NVIDIA API key (used for NVIDIA only)
  * @param {string} requestData.modelId
- * @param {string} requestData.provider - 'nvidia' | 'bedrock' | 'google' | 'github' | 'cerebras' | 'openrouter'
+ * @param {string} requestData.provider - 'nvidia' | 'bedrock' | 'google' | 'github' | 'cerebras' | 'openrouter' | 'antigravity'
  * @param {string} [requestData.region] - AWS region (for bedrock only)
  * @param {object} callbacks
  *   .onReasoning(text) - called for each reasoning token

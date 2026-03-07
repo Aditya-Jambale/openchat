@@ -12,6 +12,7 @@ export const COMPANY_ORDER = Object.freeze([
     'qwen',
     'glm',
     'google',
+    'anthropic',
     'amazon',
     'meta',
     'microsoft',
@@ -35,6 +36,7 @@ export const COMPANY_META = Object.freeze({
     qwen: { name: 'Qwen', monogram: 'QW', tone: '#8b5cf6', logoDomain: 'qwen.ai' },
     glm: { name: 'GLM', monogram: 'GL', tone: '#22d3ee', logoDomain: 'z.ai' },
     google: { name: 'Google', monogram: 'G', tone: '#60a5fa', logoDomain: 'google.com' },
+    anthropic: { name: 'Anthropic', monogram: 'AN', tone: '#d97706', logoDomain: 'anthropic.com' },
     amazon: { name: 'Amazon Nova', monogram: 'AN', tone: '#f59e0b', logoDomain: 'amazon.com' },
     meta: { name: 'Meta', monogram: 'M', tone: '#3b82f6', logoDomain: 'meta.com' },
     microsoft: { name: 'Microsoft', monogram: 'MS', tone: '#60a5fa', logoDomain: 'microsoft.com' },
@@ -53,6 +55,7 @@ const PROVIDER_LABELS = Object.freeze({
     google: 'Google API',
     github: 'GitHub Models',
     openrouter: 'OpenRouter',
+    antigravity: 'Google Antigravity',
 });
 
 export const OPENROUTER_AUTO_MODEL = Object.freeze({
@@ -369,6 +372,15 @@ function bedrockModel(model) {
     });
 }
 
+function antigravityModel(model) {
+    return decorateModel({
+        ...model,
+        provider: 'antigravity',
+        key: `antigravity::${model.id}`,
+        free: true,
+    });
+}
+
 export function getProviderLabel(provider) {
     return PROVIDER_LABELS[provider] || provider;
 }
@@ -389,6 +401,7 @@ export function inferCompanyKeyFromModelId(id = '', provider = '') {
     if (lower.startsWith('minimax.') || lower.startsWith('minimax/')) return 'minimax';
     if (lower.startsWith('qwen.') || lower.startsWith('qwen/')) return 'qwen';
     if (lower.startsWith('z-ai/') || lower.startsWith('zai-') || lower.startsWith('glm') || lower.includes('/glm-')) return 'glm';
+    if (lower.startsWith('claude-')) return 'anthropic';
     if (lower.startsWith('google.') || lower.startsWith('google/') || lower.startsWith('gemini-')) return 'google';
     if (lower.startsWith('us.amazon.nova') || lower.startsWith('amazon.')) return 'amazon';
     if (lower.startsWith('us.meta.') || lower.startsWith('meta-llama/') || lower.startsWith('meta/')) return 'meta';
@@ -438,12 +451,78 @@ export function decorateModel(model) {
     };
 }
 
+// Antigravity (Google OAuth) — free access via IDE quota
+
+const ANTIGRAVITY_MODELS = [
+    {
+        id: 'gemini-3-pro',
+        companyKey: 'google',
+        name: 'Gemini 3.1 Pro',
+        description: 'Flagship Google model with 1M context and extended thinking · via Google Antigravity',
+        contextWindow: 1000000,
+        supportsVision: true,
+        supportsThinking: true,
+        featured: true,
+    },
+    {
+        id: 'gemini-3-flash',
+        companyKey: 'google',
+        name: 'Gemini 3.0 Flash',
+        description: 'Fast Google model with 1M context · via Google Antigravity',
+        contextWindow: 1000000,
+        supportsVision: true,
+        supportsThinking: false,
+        featured: true,
+    },
+    {
+        id: 'claude-opus-4-6',
+        companyKey: 'anthropic',
+        name: 'Claude Opus 4.6',
+        description: 'Anthropic flagship model · via Google Antigravity',
+        contextWindow: 200000,
+        supportsVision: true,
+        supportsThinking: false,
+        featured: true,
+    },
+    {
+        id: 'claude-opus-4-6-thinking',
+        companyKey: 'anthropic',
+        name: 'Claude Opus 4.6 · Thinking',
+        description: 'Extended thinking · via Google Antigravity',
+        contextWindow: 200000,
+        supportsVision: false,
+        supportsThinking: true,
+        featured: false,
+    },
+    {
+        id: 'claude-sonnet-4-6',
+        companyKey: 'anthropic',
+        name: 'Claude Sonnet 4.6',
+        description: 'Balanced Anthropic model · via Google Antigravity',
+        contextWindow: 200000,
+        supportsVision: true,
+        supportsThinking: false,
+        featured: true,
+    },
+    {
+        id: 'claude-sonnet-4-6-thinking',
+        companyKey: 'anthropic',
+        name: 'Claude Sonnet 4.6 · Thinking',
+        description: 'Extended thinking · via Google Antigravity',
+        contextWindow: 200000,
+        supportsVision: false,
+        supportsThinking: true,
+        featured: false,
+    },
+];
+
 export function getAllModels() {
     return [
         decorateModel(OPENROUTER_AUTO_MODEL),
         decorateModel(NVIDIA_KIMI_MODEL),
         decorateModel(CEREBRAS_GLM_MODEL),
         decorateModel(CEREBRAS_GPT_OSS_MODEL),
+        ...ANTIGRAVITY_MODELS.map(antigravityModel),
         ...DEEPSEEK_MODELS.map(bedrockModel),
         ...NOVA_MODELS.map(bedrockModel),
         ...LLAMA_MODELS.map(bedrockModel),

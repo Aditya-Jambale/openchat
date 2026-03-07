@@ -636,10 +636,17 @@ export default async (req) => {
         );
     }
 
-    const validProviders = ['nvidia', 'bedrock', 'openrouter', 'google', 'cerebras', 'github'];
+    const validProviders = ['nvidia', 'bedrock', 'openrouter', 'google', 'cerebras', 'github', 'antigravity'];
     if (!validProviders.includes(provider)) {
         return new Response(
             JSON.stringify({ error: { code: 'BAD_REQUEST', message: `Invalid provider: "${provider}".` } }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+        );
+    }
+
+    if (provider === 'antigravity') {
+        return new Response(
+            JSON.stringify({ error: { code: 'ANTIGRAVITY_LOCAL_ONLY', message: 'Google Antigravity requires a local server for OAuth. Run "npm run dev" locally to use Antigravity models.' } }),
             { status: 400, headers: { 'Content-Type': 'application/json' } },
         );
     }

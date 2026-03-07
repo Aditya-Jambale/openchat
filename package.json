@@ -17,10 +17,13 @@
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.3.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.33",
     "marked": "^15.0.6",
     "marked-highlight": "^2.2.1",
+    "open": "^11.0.0",
+    "pkce-challenge": "^6.0.0",
     "serverless-http": "^4.0.0",
     "simple-icons": "^16.10.0"
   },

@@ -311,6 +311,12 @@ async function init() {
         if (regionSection) {
             regionSection.style.display = model.provider === 'bedrock' ? '' : 'none';
         }
+
+        // Show/hide Antigravity section for antigravity models.
+        const antigravitySection = document.getElementById('antigravity-section');
+        if (antigravitySection) {
+            antigravitySection.style.display = model.provider === 'antigravity' ? '' : 'none';
+        }
     }
 
     // ── Settings Drawer ──
@@ -556,6 +562,173 @@ async function init() {
 
     // Initialize settings for the current model
     loadSettingsForModel(initialModel.key);
+
+    // ── Google Antigravity Account Management ──
+
+    let antigravityAuthPollInterval = null;
+
+    async function fetchAntigravityStatus() {
+        try {
+            const res = await fetch('/api/antigravity/status');
+            if (!res.ok) return null;
+            return await res.json();
+        } catch {
+            return null;
+        }
+    }
+
+    function renderAntigravityAccounts(accounts) {
+        const noAccountsDiv = document.getElementById('antigravity-no-accounts');
+        const accountsListDiv = document.getElementById('antigravity-accounts-list');
+        const itemsContainer = document.getElementById('antigravity-account-items');
+
+        if (!accounts || accounts.length === 0) {
+            noAccountsDiv.style.display = '';
+            accountsListDiv.style.display = 'none';
+            return;
+        }
+
+        noAccountsDiv.style.display = 'none';
+        accountsListDiv.style.display = '';
+        itemsContainer.innerHTML = '';
+
+        for (const acct of accounts) {
+            const item = document.createElement('div');
+            item.className = 'antigravity-account-item';
+
+            const agPct = acct.quota?.antigravityPct ?? null;
+            const gcPct = acct.quota?.geminiCliPct ?? null;
+
+            item.innerHTML = `
+                <div class="antigravity-account-row">
+                    <span class="antigravity-account-email" title="${acct.email}">${acct.email}</span>
+                    <div class="antigravity-account-actions">
+                        <button class="antigravity-toggle ${acct.enabled ? 'enabled' : ''}"
+                            data-email="${acct.email}"
+                            data-enabled="${acct.enabled}">
+                            ${acct.enabled ? 'On' : 'Off'}
+                        </button>
+                        <button class="antigravity-remove" data-email="${acct.email}">✕</button>
+                    </div>
+                </div>
+                ${agPct !== null ? `
+                <div class="antigravity-quota-bars">
+                    <div class="antigravity-quota-row">
+                        <span class="antigravity-quota-label">Antigravity</span>
+                        <div class="antigravity-quota-bar-wrap">
+                            <div class="antigravity-quota-bar-fill ${agPct >= 90 ? 'critical' : agPct >= 70 ? 'high' : ''}"
+                                style="width:${agPct}%"></div>
+                        </div>
+                        <span class="antigravity-quota-pct">${agPct}%</span>
+                    </div>
+                    <div class="antigravity-quota-row">
+                        <span class="antigravity-quota-label">Gemini CLI</span>
+                        <div class="antigravity-quota-bar-wrap">
+                            <div class="antigravity-quota-bar-fill ${gcPct >= 90 ? 'critical' : gcPct >= 70 ? 'high' : ''}"
+                                style="width:${gcPct}%"></div>
+                        </div>
+                        <span class="antigravity-quota-pct">${gcPct}%</span>
+                    </div>
+                </div>` : ''}
+            `;
+
+            // Toggle enable/disable
+            item.querySelector('.antigravity-toggle').addEventListener('click', async (e) => {
+                const email = e.currentTarget.dataset.email;
+                const currentlyEnabled = e.currentTarget.dataset.enabled === 'true';
+                try {
+                    await fetch(`/api/antigravity/accounts/${encodeURIComponent(email)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enabled: !currentlyEnabled }),
+                    });
+                    const status = await fetchAntigravityStatus();
+                    if (status) renderAntigravityAccounts(status.accounts);
+                } catch {
+                    showToast('Failed to update account.', 'error');
+                }
+            });
+
+            // Remove account
+            item.querySelector('.antigravity-remove').addEventListener('click', async (e) => {
+                const email = e.currentTarget.dataset.email;
+                if (!confirm(`Remove ${email} from Antigravity?`)) return;
+                try {
+                    await fetch(`/api/antigravity/auth/${encodeURIComponent(email)}`, { method: 'DELETE' });
+                    const status = await fetchAntigravityStatus();
+                    if (status) renderAntigravityAccounts(status.accounts);
+                } catch {
+                    showToast('Failed to remove account.', 'error');
+                }
+            });
+
+            itemsContainer.appendChild(item);
+        }
+    }
+
+    async function startAntigravityAuth() {
+        const connectBtn = document.getElementById('btn-antigravity-connect');
+        const addBtn = document.getElementById('btn-antigravity-add');
+        const progressDiv = document.getElementById('antigravity-auth-progress');
+        const noAccountsDiv = document.getElementById('antigravity-no-accounts');
+
+        if (connectBtn) connectBtn.disabled = true;
+        if (addBtn) addBtn.disabled = true;
+        if (progressDiv) progressDiv.style.display = '';
+        if (noAccountsDiv) {
+            const hint = noAccountsDiv.querySelector('p');
+            if (hint) hint.style.display = 'none';
+        }
+
+        try {
+            const res = await fetch('/api/antigravity/auth/start', { method: 'POST' });
+            const data = await res.json();
+
+            if (progressDiv) progressDiv.style.display = 'none';
+
+            if (res.ok && data.success) {
+                showToast(`✅ Connected ${data.email}`, 'success', 4000);
+                renderAntigravityAccounts(data.accounts);
+            } else {
+                showToast(data?.error?.message || 'Authentication failed.', 'error', 5000);
+            }
+        } catch (err) {
+            if (progressDiv) progressDiv.style.display = 'none';
+            showToast('Authentication failed. Is the server running?', 'error');
+        } finally {
+            if (connectBtn) connectBtn.disabled = false;
+            if (addBtn) addBtn.disabled = false;
+        }
+    }
+
+    // Connect first account
+    document.getElementById('btn-antigravity-connect')?.addEventListener('click', startAntigravityAuth);
+
+    // Add another account
+    document.getElementById('btn-antigravity-add')?.addEventListener('click', startAntigravityAuth);
+
+    // Check quotas
+    document.getElementById('btn-antigravity-quota')?.addEventListener('click', async () => {
+        try {
+            const res = await fetch('/api/antigravity/quota');
+            const data = await res.json();
+            if (data.accounts) renderAntigravityAccounts(data.accounts);
+            showToast('Quota refreshed.', 'success', 2000);
+        } catch {
+            showToast('Failed to refresh quota.', 'error');
+        }
+    });
+
+    // Load initial Antigravity state when settings drawer is opened
+    const antigravitySection = document.getElementById('antigravity-section');
+    if (antigravitySection) {
+        settingsDrawer.addEventListener('transitionend', async () => {
+            if (settingsDrawer.classList.contains('open') && antigravitySection.style.display !== 'none') {
+                const status = await fetchAntigravityStatus();
+                if (status) renderAntigravityAccounts(status.accounts);
+            }
+        });
+    }
 }
 
 // ── Bedrock model family prefixes used for deduplication ──
