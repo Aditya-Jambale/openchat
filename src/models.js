@@ -6,6 +6,7 @@ export const COMPANY_ORDER = Object.freeze([
     'deepseek',
     'kimi',
     'mistral',
+    'cohere',
     'nvidia',
     'minimax',
     'qwen',
@@ -13,6 +14,7 @@ export const COMPANY_ORDER = Object.freeze([
     'google',
     'amazon',
     'meta',
+    'microsoft',
     'stepfun',
     'liquid',
     'arcee',
@@ -27,6 +29,7 @@ export const COMPANY_META = Object.freeze({
     deepseek: { name: 'DeepSeek', monogram: 'DS', tone: '#38bdf8', logoDomain: 'deepseek.com' },
     kimi: { name: 'Kimi', monogram: 'K', tone: '#facc15', logoDomain: 'kimi.com' },
     mistral: { name: 'Mistral', monogram: 'MS', tone: '#fb923c', logoDomain: 'mistral.ai' },
+    cohere: { name: 'Cohere', monogram: 'CH', tone: '#f97316', logoDomain: 'cohere.com' },
     nvidia: { name: 'NVIDIA', monogram: 'NV', tone: '#84cc16', logoDomain: 'nvidia.com' },
     minimax: { name: 'MiniMax', monogram: 'MM', tone: '#f472b6', logoDomain: 'minimax.io' },
     qwen: { name: 'Qwen', monogram: 'QW', tone: '#8b5cf6', logoDomain: 'qwen.ai' },
@@ -34,6 +37,7 @@ export const COMPANY_META = Object.freeze({
     google: { name: 'Google', monogram: 'G', tone: '#60a5fa', logoDomain: 'google.com' },
     amazon: { name: 'Amazon Nova', monogram: 'AN', tone: '#f59e0b', logoDomain: 'amazon.com' },
     meta: { name: 'Meta', monogram: 'M', tone: '#3b82f6', logoDomain: 'meta.com' },
+    microsoft: { name: 'Microsoft', monogram: 'MS', tone: '#60a5fa', logoDomain: 'microsoft.com' },
     stepfun: { name: 'StepFun', monogram: 'SF', tone: '#ef4444', logoDomain: 'stepfun.com' },
     liquid: { name: 'Liquid', monogram: 'LQ', tone: '#14b8a6', logoDomain: 'liquid.ai' },
     arcee: { name: 'Arcee', monogram: 'AR', tone: '#ec4899', logoDomain: 'arcee.ai' },
@@ -47,6 +51,7 @@ const PROVIDER_LABELS = Object.freeze({
     nvidia: 'NVIDIA NIM',
     cerebras: 'Cerebras',
     google: 'Google API',
+    github: 'GitHub Models',
     openrouter: 'OpenRouter',
 });
 
@@ -379,6 +384,7 @@ export function inferCompanyKeyFromModelId(id = '', provider = '') {
     if (lower.startsWith('moonshotai/') || lower.startsWith('moonshot.')) return 'kimi';
     if (lower.startsWith('us.deepseek.') || lower.startsWith('deepseek.') || lower.startsWith('deepseek/')) return 'deepseek';
     if (lower.startsWith('mistral.') || lower.startsWith('mistralai/') || lower.startsWith('cognitivecomputations/dolphin-mistral')) return 'mistral';
+    if (lower.startsWith('cohere/')) return 'cohere';
     if (lower.startsWith('nvidia/') || lower.startsWith('nemotron')) return 'nvidia';
     if (lower.startsWith('minimax.') || lower.startsWith('minimax/')) return 'minimax';
     if (lower.startsWith('qwen.') || lower.startsWith('qwen/')) return 'qwen';
@@ -386,6 +392,7 @@ export function inferCompanyKeyFromModelId(id = '', provider = '') {
     if (lower.startsWith('google.') || lower.startsWith('google/') || lower.startsWith('gemini-')) return 'google';
     if (lower.startsWith('us.amazon.nova') || lower.startsWith('amazon.')) return 'amazon';
     if (lower.startsWith('us.meta.') || lower.startsWith('meta-llama/') || lower.startsWith('meta/')) return 'meta';
+    if (lower.startsWith('microsoft/')) return 'microsoft';
     if (lower.startsWith('openai.') || lower.startsWith('openai/')) return 'openai';
     if (lower.startsWith('stepfun/')) return 'stepfun';
     if (lower.startsWith('liquid/')) return 'liquid';

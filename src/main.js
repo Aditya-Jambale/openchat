@@ -1,4 +1,4 @@
-import { fetchFreeOpenRouterModels, fetchGoogleModels } from './api.js';
+import { fetchFreeOpenRouterModels, fetchGitHubModels, fetchGoogleModels } from './api.js';
 import { COMPANY_ORDER, getAllModels, withModelKey } from './models.js';
 import { getApiKey, setApiKey, getSelectedModelId, setSelectedModelId, getAwsRegion, setAwsRegion } from './storage.js';
 import {
@@ -586,7 +586,11 @@ function uniqueModels(models) {
 async function loadAvailableModels() {
     const staticModels = getAllModels();
 
-    const [googleResult, openRouterResult] = await Promise.allSettled([fetchGoogleModels(), fetchFreeOpenRouterModels()]);
+    const [googleResult, githubResult, openRouterResult] = await Promise.allSettled([
+        fetchGoogleModels(),
+        fetchGitHubModels(),
+        fetchFreeOpenRouterModels(),
+    ]);
 
     const dynamicModels = [];
 
@@ -610,6 +614,28 @@ async function loadAvailableModels() {
         dynamicModels.push(...googleModels);
     } else {
         showToast(`Failed to load Google models: ${googleResult.reason.message}`, 'warning', 7000);
+    }
+
+    if (githubResult.status === 'fulfilled') {
+        const githubModels = githubResult.value
+            .filter((model) => model?.id)
+            .map((model) =>
+                withModelKey({
+                    id: model.id,
+                    provider: 'github',
+                    name: model.name || model.id,
+                    description: model.description,
+                    supportsVision: !!model.supportsVision,
+                    supportsThinking: false,
+                    contextWindow: model.context_length || 32768,
+                    group: 'GitHub Models',
+                }),
+            )
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        dynamicModels.push(...githubModels);
+    } else {
+        showToast(`Failed to load GitHub models: ${githubResult.reason.message}`, 'warning', 7000);
     }
 
     if (openRouterResult.status === 'fulfilled') {

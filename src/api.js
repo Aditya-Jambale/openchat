@@ -22,6 +22,18 @@ export async function fetchGoogleModels() {
     return Array.isArray(data.models) ? data.models : [];
 }
 
+export async function fetchGitHubModels() {
+    const res = await fetch('/api/models/github');
+
+    if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || `Failed to load GitHub models (${res.status})`);
+    }
+
+    const data = await res.json();
+    return Array.isArray(data.models) ? data.models : [];
+}
+
 /**
  * Stream a chat completion for the selected model/provider.
  *
@@ -29,7 +41,7 @@ export async function fetchGoogleModels() {
  * @param {Array} requestData.messages - conversation messages [{role, content}]
  * @param {string} requestData.apiKey - NVIDIA API key (used for NVIDIA only)
  * @param {string} requestData.modelId
- * @param {string} requestData.provider - 'nvidia' | 'bedrock' | 'google' | 'cerebras' | 'openrouter'
+ * @param {string} requestData.provider - 'nvidia' | 'bedrock' | 'google' | 'github' | 'cerebras' | 'openrouter'
  * @param {string} [requestData.region] - AWS region (for bedrock only)
  * @param {object} callbacks
  *   .onReasoning(text) - called for each reasoning token

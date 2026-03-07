@@ -19,6 +19,8 @@ app.use(express.json({ limit: '50mb' }));
 const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const NVIDIA_MODEL_ID = 'moonshotai/kimi-k2.5';
 const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
+const GITHUB_MODELS_URL = 'https://models.github.ai/catalog/models';
+const GITHUB_INFERENCE_URL = 'https://models.github.ai/inference/chat/completions';
 const GOOGLE_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GOOGLE_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GOOGLE_PROMPT_SUGGESTION_MODEL = 'gemini-2.5-flash-lite';
@@ -268,6 +270,61 @@ app.get('/api/models/google', async (_req, res) => {
     }
 });
 
+app.get('/api/models/github', async (_req, res) => {
+    const githubModelsToken = process.env.GITHUB_MODELS_TOKEN?.trim();
+
+    if (!githubModelsToken) {
+        return res.status(500).json({
+            error: {
+                code: 'MISSING_GITHUB_MODELS_TOKEN',
+                message: 'GITHUB_MODELS_TOKEN is not configured on the server.',
+            },
+        });
+    }
+
+    try {
+        const response = await axios.get(GITHUB_MODELS_URL, {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                Authorization: `Bearer ${githubModelsToken}`,
+                'X-GitHub-Api-Version': '2022-11-28',
+            },
+            timeout: 20000,
+            httpsAgent: keepAliveAgent,
+        });
+
+        const models = Array.isArray(response.data) ? response.data : [];
+        const githubModels = models
+            .filter(isPreferredGitHubModel)
+            .map((model) => ({
+                id: model.id,
+                name: model.name || model.id,
+                description: buildGitHubModelDescription(model),
+                supportsVision: Array.isArray(model.supported_input_modalities) && model.supported_input_modalities.includes('image'),
+                provider: 'github',
+                context_length: model.limits?.max_input_tokens || null,
+                rate_limit_tier: model.rate_limit_tier || null,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        return res.json({ models: githubModels });
+    } catch (error) {
+        const status = error.response?.status || 500;
+        const message =
+            error.response?.data?.error?.message ||
+            error.response?.data?.message ||
+            error.message ||
+            'Failed to fetch GitHub Models catalog.';
+
+        return res.status(status).json({
+            error: {
+                code: 'GITHUB_MODELS_FETCH_FAILED',
+                message,
+            },
+        });
+    }
+});
+
 app.get('/api/prompt-suggestions', async (req, res) => {
     const googleApiKey = process.env.GOOGLE_API_KEY;
     const nonce = String(req.query?.nonce || '').trim();
@@ -323,12 +380,12 @@ app.post('/api/chat', async (req, res) => {
         });
     }
 
-    if (provider !== 'nvidia' && provider !== 'bedrock' && provider !== 'openrouter' && provider !== 'google' && provider !== 'cerebras') {
+    if (provider !== 'nvidia' && provider !== 'bedrock' && provider !== 'openrouter' && provider !== 'google' && provider !== 'cerebras' && provider !== 'github') {
         console.error(`[ERROR] Invalid provider received: "${provider}" (type: ${typeof provider})`);
         return res.status(400).json({
             error: {
                 code: 'BAD_REQUEST',
-                message: `Invalid provider: "${provider}". Use "nvidia", "bedrock", "google", "cerebras", or "openrouter".`,
+                message: `Invalid provider: "${provider}". Use "nvidia", "bedrock", "google", "github", "cerebras", or "openrouter".`,
             },
         });
     }
@@ -354,6 +411,18 @@ app.post('/api/chat', async (req, res) => {
                 error: {
                     code: 'INVALID_KEY',
                     message: 'Invalid Cerebras API key. Key must start with "csk-".',
+                },
+            });
+        }
+    }
+
+    if (provider === 'github') {
+        const apiKey = process.env.GITHUB_MODELS_TOKEN || clientKey;
+        if (!apiKey || !apiKey.startsWith('github_pat_')) {
+            return res.status(401).json({
+                error: {
+                    code: 'INVALID_KEY',
+                    message: 'Invalid GitHub Models token. Provide a fine-grained GitHub PAT for Models.',
                 },
             });
         }
@@ -386,6 +455,10 @@ app.post('/api/chat', async (req, res) => {
 
     if (provider === 'google') {
         return streamGoogle({ req, res, messages, modelId, params, systemPrompt: system_prompt });
+    }
+
+    if (provider === 'github') {
+        return streamGitHubModels({ req, res, messages, modelId, clientKey, params });
     }
 
     if (provider === 'cerebras') {
@@ -578,6 +651,139 @@ async function streamGoogle({ req, res, messages, modelId, params = {}, systemPr
                     type: 'error',
                     code: 429,
                     text: 'Google API rate limit exceeded. Please wait and try again.',
+                })}\n\n`,
+            );
+        } else {
+            res.write(
+                `data: ${JSON.stringify({
+                    type: 'error',
+                    code: status,
+                    text: message,
+                })}\n\n`,
+            );
+        }
+        res.end();
+    }
+}
+
+async function streamGitHubModels({ req, res, messages, modelId, clientKey, params = {} }) {
+    const githubModelsToken = process.env.GITHUB_MODELS_TOKEN || clientKey;
+
+    if (!githubModelsToken) {
+        res.write(
+            `data: ${JSON.stringify({
+                type: 'error',
+                code: 500,
+                text: 'GITHUB_MODELS_TOKEN is not configured on the server.',
+            })}\n\n`,
+        );
+        res.end();
+        return;
+    }
+
+    try {
+        const payload = {
+            model: modelId,
+            messages,
+            stream: true,
+        };
+
+        if (params.temperature != null) payload.temperature = params.temperature;
+        if (params.top_p != null) payload.top_p = params.top_p;
+        if (params.max_tokens != null) payload.max_tokens = params.max_tokens;
+        if (params.frequency_penalty != null) payload.frequency_penalty = params.frequency_penalty;
+        if (params.presence_penalty != null) payload.presence_penalty = params.presence_penalty;
+
+        const response = await axios.post(GITHUB_INFERENCE_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${githubModelsToken}`,
+                'Content-Type': 'application/json',
+                Accept: 'text/event-stream',
+            },
+            responseType: 'stream',
+            httpsAgent: keepAliveAgent,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            timeout: 60000,
+        });
+
+        req.on('close', () => {
+            response.data.destroy();
+        });
+
+        response.data.on('data', (chunk) => {
+            const lines = chunk.toString().split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    try {
+                        const parsed = JSON.parse(line.slice(6));
+
+                        if (parsed.error?.message) {
+                            res.write(
+                                `data: ${JSON.stringify({
+                                    type: 'error',
+                                    code: parsed.error?.code || 500,
+                                    text: parsed.error.message,
+                                })}\n\n`,
+                            );
+                            continue;
+                        }
+
+                        const delta = parsed.choices?.[0]?.delta || {};
+                        const reasoning = getReasoningText(delta);
+                        const content = getContentText(delta.content);
+
+                        if (reasoning) {
+                            res.write(`data: ${JSON.stringify({ type: 'reasoning', text: reasoning })}\n\n`);
+                        }
+                        if (content) {
+                            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
+                        }
+                    } catch {
+                        // Skip malformed JSON chunks.
+                    }
+                } else if (line.trim() === 'data: [DONE]') {
+                    res.write('data: [DONE]\n\n');
+                }
+            }
+        });
+
+        response.data.on('end', () => {
+            res.write('data: [DONE]\n\n');
+            res.end();
+        });
+
+        response.data.on('error', (err) => {
+            console.error('GitHub Models stream error:', err.message);
+            res.write(`data: ${JSON.stringify({ type: 'error', text: 'Stream interrupted.' })}\n\n`);
+            res.end();
+        });
+    } catch (error) {
+        const errorData = await readAxiosErrorPayload(error);
+        const status = error.response?.status || 500;
+        const message =
+            errorData?.error?.message ||
+            errorData?.message ||
+            errorData?.detail ||
+            (typeof errorData === 'string' ? errorData : null) ||
+            error.message ||
+            'Unknown GitHub Models error';
+
+        if (status === 401 || status === 403) {
+            res.write(
+                `data: ${JSON.stringify({
+                    type: 'error',
+                    code: status,
+                    text: 'GitHub Models token is invalid or lacks model access.',
+                })}\n\n`,
+            );
+        } else if (status === 429) {
+            res.write(
+                `data: ${JSON.stringify({
+                    type: 'error',
+                    code: 429,
+                    text: 'GitHub Models rate limit exceeded. Please wait and try again.',
                 })}\n\n`,
             );
         } else {
@@ -1198,6 +1404,53 @@ function isSupportedGoogleModel(model) {
     }
 
     return !/(image|tts|robotics|computer-use|deep-research|customtools)/.test(id);
+}
+
+const PREFERRED_GITHUB_MODEL_IDS = new Set([
+    'openai/gpt-4o',
+    'openai/gpt-4o-mini',
+    'openai/gpt-4.1',
+    'openai/gpt-4.1-mini',
+    'openai/gpt-4.1-nano',
+    'deepseek/deepseek-v3-0324',
+    'meta/llama-3.3-70b-instruct',
+    'meta/meta-llama-3.1-8b-instruct',
+    'meta/llama-4-maverick-17b-128e-instruct-fp8',
+    'mistral-ai/mistral-medium-2505',
+    'mistral-ai/mistral-small-2503',
+    'mistral-ai/codestral-2501',
+    'microsoft/phi-4-reasoning',
+    'microsoft/phi-4-multimodal-instruct',
+    'cohere/cohere-command-r-plus-08-2024',
+    'cohere/cohere-command-r-08-2024',
+]);
+
+function isPreferredGitHubModel(model) {
+    const id = String(model?.id || '').trim();
+    const capabilities = Array.isArray(model?.capabilities) ? model.capabilities : [];
+    const outputModalities = Array.isArray(model?.supported_output_modalities)
+        ? model.supported_output_modalities
+        : [];
+
+    if (!id || !PREFERRED_GITHUB_MODEL_IDS.has(id)) {
+        return false;
+    }
+
+    if (!capabilities.includes('streaming')) {
+        return false;
+    }
+
+    return outputModalities.includes('text');
+}
+
+function buildGitHubModelDescription(model) {
+    const summary = String(model?.summary || '').trim();
+    const rateLimitTier = model?.rate_limit_tier ? `${model.rate_limit_tier} tier` : null;
+    const inputLimit = model?.limits?.max_input_tokens
+        ? `${Math.round(model.limits.max_input_tokens / 1000)}K context`
+        : null;
+
+    return [summary, rateLimitTier, inputLimit].filter(Boolean).join(' - ');
 }
 
 function supportsGoogleVision(model) {
