@@ -1419,10 +1419,7 @@ const PREFERRED_GITHUB_MODEL_IDS = new Set([
     'mistral-ai/mistral-medium-2505',
     'mistral-ai/mistral-small-2503',
     'mistral-ai/codestral-2501',
-    'microsoft/phi-4-reasoning',
     'microsoft/phi-4-multimodal-instruct',
-    'cohere/cohere-command-r-plus-08-2024',
-    'cohere/cohere-command-r-08-2024',
 ]);
 
 function isPreferredGitHubModel(model) {

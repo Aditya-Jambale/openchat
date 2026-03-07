@@ -383,7 +383,7 @@ export function inferCompanyKeyFromModelId(id = '', provider = '') {
     if (lower.startsWith('openrouter/')) return 'openrouter';
     if (lower.startsWith('moonshotai/') || lower.startsWith('moonshot.')) return 'kimi';
     if (lower.startsWith('us.deepseek.') || lower.startsWith('deepseek.') || lower.startsWith('deepseek/')) return 'deepseek';
-    if (lower.startsWith('mistral.') || lower.startsWith('mistralai/') || lower.startsWith('cognitivecomputations/dolphin-mistral')) return 'mistral';
+    if (lower.startsWith('mistral.') || lower.startsWith('mistralai/') || lower.startsWith('mistral-ai/') || lower.startsWith('cognitivecomputations/dolphin-mistral')) return 'mistral';
     if (lower.startsWith('cohere/')) return 'cohere';
     if (lower.startsWith('nvidia/') || lower.startsWith('nemotron')) return 'nvidia';
     if (lower.startsWith('minimax.') || lower.startsWith('minimax/')) return 'minimax';
