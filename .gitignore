@@ -4,3 +4,7 @@ dist/
 
 # Local Netlify folder
 .netlify
+
+# Antigravity OAuth tokens (sensitive — contains Google refresh tokens)
+*.err.log
+*.out.log
