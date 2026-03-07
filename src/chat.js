@@ -273,8 +273,27 @@ export async function sendMessage(text, imageFile = null) {
     let reasoningText = '';
     let contentText = '';
     let thinkingStartTime = null;
+    let thinkingTimerRAF = null;
     isStreaming = true;
     setGenerating(true);
+
+    // Live timer — updates the label every ~100ms while reasoning is streaming.
+    function startThinkingTimer() {
+        function tick() {
+            if (!thinkingStartTime) { thinkingTimerRAF = requestAnimationFrame(tick); return; }
+            const elapsed = ((performance.now() - thinkingStartTime) / 1000).toFixed(1);
+            thinkingLabel.textContent = `Thinking for ${elapsed}s`;
+            thinkingTimerRAF = requestAnimationFrame(tick);
+        }
+        thinkingTimerRAF = requestAnimationFrame(tick);
+    }
+
+    function stopThinkingTimer() {
+        if (thinkingTimerRAF != null) {
+            cancelAnimationFrame(thinkingTimerRAF);
+            thinkingTimerRAF = null;
+        }
+    }
 
     // Get current model settings.
     const modelParams = getModelParams(selectedModel.key);
@@ -298,6 +317,7 @@ export async function sendMessage(text, imageFile = null) {
             onReasoning(token) {
                 if (!thinkingStartTime) {
                     thinkingStartTime = performance.now();
+                    startThinkingTimer();
                 }
                 reasoningText += token;
                 thinkingBody.textContent = reasoningText;
@@ -310,7 +330,8 @@ export async function sendMessage(text, imageFile = null) {
 
             onContent(token) {
                 if (reasoningText && !thinkingBlock.classList.contains('thinking-done')) {
-                    // Transition: spinner → checkmark + timer
+                    // Transition: spinner → checkmark + final timer
+                    stopThinkingTimer();
                     thinkingBlock.classList.add('thinking-done');
                     thinkingSpinner.classList.add('hidden');
                     thinkingCheck.classList.remove('hidden');
@@ -330,6 +351,7 @@ export async function sendMessage(text, imageFile = null) {
             async onDone() {
                 isStreaming = false;
                 setGenerating(false);
+                stopThinkingTimer();
 
                 // Finalize thinking UI
                 if (reasoningText) {
@@ -381,6 +403,7 @@ export async function sendMessage(text, imageFile = null) {
             async onError(error) {
                 isStreaming = false;
                 setGenerating(false);
+                stopThinkingTimer();
 
                 if (error.code === 401) {
                     showToast('Invalid API key. Please check your key in settings.', 'error');

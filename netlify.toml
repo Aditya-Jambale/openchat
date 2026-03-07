@@ -5,7 +5,16 @@
 [functions]
   node_bundler = "esbuild"
 
-# Proxy /api to Netlify function
+# Streaming chat endpoint — handled by the v2 function (chat.mjs) which
+# returns a native ReadableStream Response so SSE tokens arrive in real-time.
+# Must come before the generic /api/* redirect so it takes priority.
+[[redirects]]
+  from = "/api/chat"
+  to = "/.netlify/functions/chat"
+  status = 200
+  force = true
+
+# All other /api routes — handled by the Express app via serverless-http.
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
