@@ -45,6 +45,7 @@ export const COMPANY_META = Object.freeze({
 const PROVIDER_LABELS = Object.freeze({
     bedrock: 'Bedrock',
     nvidia: 'NVIDIA NIM',
+    cerebras: 'Cerebras',
     google: 'Google API',
     openrouter: 'OpenRouter',
 });
@@ -72,6 +73,19 @@ export const NVIDIA_KIMI_MODEL = Object.freeze({
     contextWindow: 262144,
     supportsVision: true,
     supportsThinking: true,
+    featured: true,
+});
+
+export const CEREBRAS_GLM_MODEL = Object.freeze({
+    key: 'cerebras::zai-glm-4.7',
+    id: 'zai-glm-4.7',
+    provider: 'cerebras',
+    companyKey: 'glm',
+    name: 'GLM 4.7',
+    description: 'Z.ai GLM 4.7 served through Cerebras Inference.',
+    contextWindow: 131072,
+    supportsVision: false,
+    supportsThinking: false,
     featured: true,
 });
 
@@ -355,7 +369,7 @@ export function inferCompanyKeyFromModelId(id = '', provider = '') {
     if (lower.startsWith('nvidia/') || lower.startsWith('nemotron')) return 'nvidia';
     if (lower.startsWith('minimax.') || lower.startsWith('minimax/')) return 'minimax';
     if (lower.startsWith('qwen.') || lower.startsWith('qwen/')) return 'qwen';
-    if (lower.startsWith('z-ai/') || lower.startsWith('glm') || lower.includes('/glm-')) return 'glm';
+    if (lower.startsWith('z-ai/') || lower.startsWith('zai-') || lower.startsWith('glm') || lower.includes('/glm-')) return 'glm';
     if (lower.startsWith('google.') || lower.startsWith('google/') || lower.startsWith('gemini-')) return 'google';
     if (lower.startsWith('us.amazon.nova') || lower.startsWith('amazon.')) return 'amazon';
     if (lower.startsWith('us.meta.') || lower.startsWith('meta-llama/') || lower.startsWith('meta/')) return 'meta';
@@ -408,6 +422,7 @@ export function getAllModels() {
     return [
         decorateModel(OPENROUTER_AUTO_MODEL),
         decorateModel(NVIDIA_KIMI_MODEL),
+        decorateModel(CEREBRAS_GLM_MODEL),
         ...DEEPSEEK_MODELS.map(bedrockModel),
         ...NOVA_MODELS.map(bedrockModel),
         ...LLAMA_MODELS.map(bedrockModel),

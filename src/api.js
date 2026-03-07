@@ -29,7 +29,7 @@ export async function fetchGoogleModels() {
  * @param {Array} requestData.messages - conversation messages [{role, content}]
  * @param {string} requestData.apiKey - NVIDIA API key (used for NVIDIA only)
  * @param {string} requestData.modelId
- * @param {string} requestData.provider - 'nvidia' | 'bedrock' | 'google' | 'openrouter'
+ * @param {string} requestData.provider - 'nvidia' | 'bedrock' | 'google' | 'cerebras' | 'openrouter'
  * @param {string} [requestData.region] - AWS region (for bedrock only)
  * @param {object} callbacks
  *   .onReasoning(text) - called for each reasoning token

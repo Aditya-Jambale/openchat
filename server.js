@@ -18,6 +18,7 @@ app.use(express.json({ limit: '50mb' }));
 
 const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const NVIDIA_MODEL_ID = 'moonshotai/kimi-k2.5';
+const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
 const GOOGLE_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GOOGLE_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GOOGLE_PROMPT_SUGGESTION_MODEL = 'gemini-2.5-flash-lite';
@@ -322,12 +323,12 @@ app.post('/api/chat', async (req, res) => {
         });
     }
 
-    if (provider !== 'nvidia' && provider !== 'bedrock' && provider !== 'openrouter' && provider !== 'google') {
+    if (provider !== 'nvidia' && provider !== 'bedrock' && provider !== 'openrouter' && provider !== 'google' && provider !== 'cerebras') {
         console.error(`[ERROR] Invalid provider received: "${provider}" (type: ${typeof provider})`);
         return res.status(400).json({
             error: {
                 code: 'BAD_REQUEST',
-                message: `Invalid provider: "${provider}". Use "nvidia", "bedrock", "google", or "openrouter".`,
+                message: `Invalid provider: "${provider}". Use "nvidia", "bedrock", "google", "cerebras", or "openrouter".`,
             },
         });
     }
@@ -341,6 +342,18 @@ app.post('/api/chat', async (req, res) => {
                 error: {
                     code: 'INVALID_KEY',
                     message: 'Invalid API key. Key must start with "nvapi-".',
+                },
+            });
+        }
+    }
+
+    if (provider === 'cerebras') {
+        const apiKey = process.env.CEREBRAS_API_KEY || clientKey;
+        if (!apiKey || !apiKey.startsWith('csk-')) {
+            return res.status(401).json({
+                error: {
+                    code: 'INVALID_KEY',
+                    message: 'Invalid Cerebras API key. Key must start with "csk-".',
                 },
             });
         }
@@ -373,6 +386,10 @@ app.post('/api/chat', async (req, res) => {
 
     if (provider === 'google') {
         return streamGoogle({ req, res, messages, modelId, params, systemPrompt: system_prompt });
+    }
+
+    if (provider === 'cerebras') {
+        return streamCerebras({ req, res, messages, modelId, clientKey, params });
     }
 
     if (provider === 'openrouter') {
@@ -561,6 +578,147 @@ async function streamGoogle({ req, res, messages, modelId, params = {}, systemPr
                     type: 'error',
                     code: 429,
                     text: 'Google API rate limit exceeded. Please wait and try again.',
+                })}\n\n`,
+            );
+        } else {
+            res.write(
+                `data: ${JSON.stringify({
+                    type: 'error',
+                    code: status,
+                    text: message,
+                })}\n\n`,
+            );
+        }
+        res.end();
+    }
+}
+
+async function streamCerebras({ req, res, messages, modelId, clientKey, params = {} }) {
+    const cerebrasApiKey = process.env.CEREBRAS_API_KEY || clientKey;
+
+    if (!cerebrasApiKey) {
+        res.write(
+            `data: ${JSON.stringify({
+                type: 'error',
+                code: 500,
+                text: 'CEREBRAS_API_KEY is not configured on the server.',
+            })}\n\n`,
+        );
+        res.end();
+        return;
+    }
+
+    try {
+        const payload = {
+            model: modelId,
+            messages,
+            stream: true,
+        };
+
+        if (params.temperature != null) payload.temperature = params.temperature;
+        if (params.top_p != null) payload.top_p = params.top_p;
+        if (params.max_tokens != null) payload.max_tokens = params.max_tokens;
+        if (params.frequency_penalty != null) payload.frequency_penalty = params.frequency_penalty;
+        if (params.presence_penalty != null) payload.presence_penalty = params.presence_penalty;
+
+        const response = await axios.post(CEREBRAS_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${cerebrasApiKey}`,
+                Accept: 'text/event-stream',
+                'Content-Type': 'application/json',
+            },
+            responseType: 'stream',
+            httpsAgent: keepAliveAgent,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            timeout: 60000,
+        });
+
+        req.on('close', () => {
+            response.data.destroy();
+        });
+
+        response.data.on('data', (chunk) => {
+            const lines = chunk.toString().split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    try {
+                        const parsed = JSON.parse(line.slice(6));
+
+                        if (parsed.error?.message) {
+                            res.write(
+                                `data: ${JSON.stringify({
+                                    type: 'error',
+                                    code: parsed.error?.code || 500,
+                                    text: parsed.error.message,
+                                })}\n\n`,
+                            );
+                            continue;
+                        }
+
+                        const delta = parsed.choices?.[0]?.delta || {};
+                        const reasoning = getReasoningText(delta);
+                        const content = getContentText(delta.content);
+
+                        if (reasoning) {
+                            res.write(`data: ${JSON.stringify({ type: 'reasoning', text: reasoning })}\n\n`);
+                        }
+                        if (content) {
+                            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
+                        }
+                    } catch {
+                        // Skip malformed JSON chunks.
+                    }
+                } else if (line.trim() === 'data: [DONE]') {
+                    res.write('data: [DONE]\n\n');
+                }
+            }
+        });
+
+        response.data.on('end', () => {
+            res.write('data: [DONE]\n\n');
+            res.end();
+        });
+
+        response.data.on('error', (err) => {
+            console.error('Cerebras stream error:', err.message);
+            res.write(`data: ${JSON.stringify({ type: 'error', text: 'Stream interrupted.' })}\n\n`);
+            res.end();
+        });
+    } catch (error) {
+        const errorData = await readAxiosErrorPayload(error);
+        const status = error.response?.status || 500;
+        const message =
+            errorData?.error?.message ||
+            errorData?.message ||
+            errorData?.detail ||
+            (typeof errorData === 'string' ? errorData : null) ||
+            error.message ||
+            'Unknown Cerebras API error';
+
+        if (status === 401 || status === 403) {
+            res.write(
+                `data: ${JSON.stringify({
+                    type: 'error',
+                    code: status,
+                    text: 'Cerebras API key is invalid or lacks access to the requested model.',
+                })}\n\n`,
+            );
+        } else if (status === 404) {
+            res.write(
+                `data: ${JSON.stringify({
+                    type: 'error',
+                    code: 404,
+                    text: message,
+                })}\n\n`,
+            );
+        } else if (status === 429) {
+            res.write(
+                `data: ${JSON.stringify({
+                    type: 'error',
+                    code: 429,
+                    text: 'Cerebras rate limit exceeded. Please wait and try again.',
                 })}\n\n`,
             );
         } else {
@@ -1125,6 +1283,28 @@ function getReasoningText(delta) {
     if (typeof delta?.reasoning === 'string') return delta.reasoning;
     if (typeof delta?.reasoning_content === 'string') return delta.reasoning_content;
     return '';
+}
+
+async function readAxiosErrorPayload(error) {
+    const data = error?.response?.data;
+    if (!data) return null;
+    if (typeof data === 'string') return data;
+
+    if (typeof data?.on === 'function' && typeof data?.read !== 'undefined') {
+        const chunks = [];
+        for await (const chunk of data) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+        }
+
+        const raw = Buffer.concat(chunks).toString('utf8');
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return raw;
+        }
+    }
+
+    return data;
 }
 
 // ═══════════════════════════════════════════════
