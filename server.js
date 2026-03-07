@@ -3,32 +3,10 @@ import cors from 'cors';
 import axios from 'axios';
 import https from 'https';
 import dotenv from 'dotenv';
-import rateLimit from 'express-rate-limit';
 import {
     BedrockRuntimeClient,
     ConverseStreamCommand,
 } from '@aws-sdk/client-bedrock-runtime';
-import { startOAuthFlow } from './src/antigravity/oauth.js';
-import {
-    loadAccounts,
-    addAccount,
-    removeAccount,
-    enableAccount,
-    disableAccount,
-    listAccounts,
-    selectBestAccount,
-    markRateLimited,
-    regenerateFingerprint,
-} from './src/antigravity/accounts.js';
-import {
-    ANTIGRAVITY_ENDPOINTS,
-    ANTIGRAVITY_STREAM_PATH,
-    GEMINI_CLI_ENDPOINT,
-    ANTIGRAVITY_MODEL_MAP,
-    GEMINI_CLI_MODELS,
-} from './src/antigravity/constants.js';
-import { transformRequest, buildThinkingHeaders, stripXGoogUserProject } from './src/antigravity/request.js';
-import { refreshQuota, shouldRefreshQuota, getQuotaSummary } from './src/antigravity/quota.js';
 
 dotenv.config();
 
@@ -402,12 +380,12 @@ app.post('/api/chat', async (req, res) => {
         });
     }
 
-    if (provider !== 'nvidia' && provider !== 'bedrock' && provider !== 'openrouter' && provider !== 'google' && provider !== 'cerebras' && provider !== 'github' && provider !== 'antigravity') {
+    if (provider !== 'nvidia' && provider !== 'bedrock' && provider !== 'openrouter' && provider !== 'google' && provider !== 'cerebras' && provider !== 'github') {
         console.error(`[ERROR] Invalid provider received: "${provider}" (type: ${typeof provider})`);
         return res.status(400).json({
             error: {
                 code: 'BAD_REQUEST',
-                message: `Invalid provider: "${provider}". Use "nvidia", "bedrock", "google", "github", "cerebras", "openrouter", or "antigravity".`,
+                message: `Invalid provider: "${provider}". Use "nvidia", "bedrock", "google", "github", "cerebras", or "openrouter".`,
             },
         });
     }
@@ -489,10 +467,6 @@ app.post('/api/chat', async (req, res) => {
 
     if (provider === 'openrouter') {
         return streamOpenRouter({ req, res, messages, modelId, params });
-    }
-
-    if (provider === 'antigravity') {
-        return streamAntigravity({ req, res, messages, modelKey: modelId, params });
     }
 
     return streamNvidia({ req, res, messages, clientKey, params });
@@ -1267,304 +1241,6 @@ async function streamOpenRouter({ req, res, messages, modelId, params = {} }) {
         }
         res.end();
     }
-}
-
-// ═══════════════════════════════════════════════
-// Antigravity — Google OAuth free AI access
-// ═══════════════════════════════════════════════
-
-// Auth Management endpoints
-
-app.get('/api/antigravity/status', (req, res) => {
-    const accounts = listAccounts();
-    res.json({
-        connected: accounts.length > 0,
-        accounts: accounts.map(({ email, enabled, quotaCache }) => ({
-            email,
-            enabled,
-            quota: quotaCache
-                ? {
-                      antigravityPct: Math.round(
-                          ((quotaCache.antigravity?.used ?? 0) /
-                              (quotaCache.antigravity?.limit ?? 100)) *
-                              100,
-                      ),
-                      geminiCliPct: Math.round(
-                          ((quotaCache.geminiCli?.used ?? 0) /
-                              (quotaCache.geminiCli?.limit ?? 100)) *
-                              100,
-                      ),
-                      resetAt: quotaCache.antigravity?.resetAt ?? null,
-                  }
-                : null,
-        })),
-    });
-});
-
-// Rate limiter for Antigravity OAuth endpoints — max 5 auth attempts per minute per IP
-const antigravityAuthRateLimit = rateLimit({
-    windowMs: 60 * 1000,
-    max: 5,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: { code: 'RATE_LIMITED', message: 'Too many authentication attempts. Please wait a moment.' } },
-});
-
-app.post('/api/antigravity/auth/start', antigravityAuthRateLimit, async (req, res) => {
-    try {
-        const tokenData = await startOAuthFlow();
-        addAccount(tokenData);
-        const accounts = listAccounts();
-        res.json({
-            success: true,
-            email: tokenData.email,
-            accounts: accounts.map(({ email, enabled }) => ({ email, enabled })),
-        });
-    } catch (err) {
-        console.error('[antigravity] OAuth flow failed:', err.message);
-        res.status(500).json({ error: { code: 'OAUTH_FAILED', message: err.message } });
-    }
-});
-
-app.post('/api/antigravity/auth/add', antigravityAuthRateLimit, async (req, res) => {
-    try {
-        const tokenData = await startOAuthFlow();
-        addAccount(tokenData);
-        const accounts = listAccounts();
-        res.json({
-            success: true,
-            email: tokenData.email,
-            accounts: accounts.map(({ email, enabled }) => ({ email, enabled })),
-        });
-    } catch (err) {
-        console.error('[antigravity] Add account failed:', err.message);
-        res.status(500).json({ error: { code: 'OAUTH_FAILED', message: err.message } });
-    }
-});
-
-app.delete('/api/antigravity/auth/:email', (req, res) => {
-    const { email } = req.params;
-    removeAccount(decodeURIComponent(email));
-    const accounts = listAccounts();
-    res.json({ accounts: accounts.map(({ email: e, enabled }) => ({ email: e, enabled })) });
-});
-
-app.get('/api/antigravity/quota', async (req, res) => {
-    const store = loadAccounts();
-    const results = [];
-
-    for (const account of store.accounts) {
-        if (shouldRefreshQuota(account)) {
-            await refreshQuota(account).catch(() => {});
-        }
-        const cache = account.quotaCache;
-        results.push({
-            email: account.email,
-            enabled: account.enabled,
-            antigravityPct: cache
-                ? Math.round(((cache.antigravity?.used ?? 0) / (cache.antigravity?.limit ?? 100)) * 100)
-                : null,
-            geminiCliPct: cache
-                ? Math.round(((cache.geminiCli?.used ?? 0) / (cache.geminiCli?.limit ?? 100)) * 100)
-                : null,
-            resetAt: cache?.antigravity?.resetAt ?? null,
-        });
-    }
-
-    res.json({ accounts: results });
-});
-
-app.patch('/api/antigravity/accounts/:email', (req, res) => {
-    const { email } = req.params;
-    const { enabled } = req.body;
-    const decodedEmail = decodeURIComponent(email);
-
-    if (enabled === true) {
-        enableAccount(decodedEmail);
-    } else if (enabled === false) {
-        disableAccount(decodedEmail);
-    }
-
-    const accounts = listAccounts();
-    res.json({ accounts: accounts.map(({ email: e, enabled: en }) => ({ email: e, enabled: en })) });
-});
-
-// ── Antigravity Chat Streaming ──
-
-async function streamAntigravity({ req, res, messages, modelKey, params = {} }) {
-    const selected = await selectBestAccount();
-
-    if (!selected) {
-        res.write(
-            `data: ${JSON.stringify({
-                type: 'error',
-                code: 401,
-                text: 'No Google Antigravity accounts connected. Open Settings → Google Antigravity to sign in.',
-            })}\n\n`,
-        );
-        res.end();
-        return;
-    }
-
-    const { account } = selected;
-    const useGeminiCli = GEMINI_CLI_MODELS.includes(modelKey);
-    const resolvedModelId = ANTIGRAVITY_MODEL_MAP[modelKey] || modelKey;
-
-    const settings = {
-        temperature: params.temperature,
-        topP: params.top_p,
-        maxTokens: params.max_tokens,
-    };
-
-    const body = transformRequest(messages, modelKey, settings, account);
-    const thinkingHeaders = buildThinkingHeaders(modelKey);
-
-    let baseHeaders = {
-        Authorization: `Bearer ${account.accessToken}`,
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        ...selected.headers,
-        ...thinkingHeaders,
-    };
-    baseHeaders = stripXGoogUserProject(baseHeaders);
-
-    const tryRequest = async (endpoint) => {
-        const streamPath = ANTIGRAVITY_STREAM_PATH.replace('{projectId}', account.projectId);
-        const tryUrl = useGeminiCli
-            ? `${GEMINI_CLI_ENDPOINT}/${resolvedModelId}:streamGenerateContent?alt=sse`
-            : `${endpoint}${streamPath}`;
-
-        return axios.post(tryUrl, body, {
-            headers: baseHeaders,
-            responseType: 'stream',
-            httpsAgent: keepAliveAgent,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-            timeout: 90000,
-        });
-    };
-
-    let response;
-    let lastError;
-
-    // Try Antigravity endpoints in order (only for non-Gemini CLI requests)
-    const endpoints = useGeminiCli ? [null] : ANTIGRAVITY_ENDPOINTS;
-    for (const endpoint of endpoints) {
-        try {
-            response = await tryRequest(endpoint);
-            break;
-        } catch (err) {
-            lastError = err;
-            const status = err.response?.status;
-
-            // Don't retry on auth or quota errors — rotate account instead
-            if (status === 401 || status === 403 || status === 429) {
-                break;
-            }
-            // Try next endpoint for 5xx errors
-        }
-    }
-
-    if (!response) {
-        const status = lastError?.response?.status;
-
-        if (status === 429) {
-            const retryAfter = parseInt(lastError.response?.headers?.['retry-after'] || '60', 10);
-            markRateLimited(account.email, retryAfter);
-            regenerateFingerprint(account.email);
-
-            // Try with next account
-            const next = await selectBestAccount([account.email]);
-            if (next) {
-                return streamAntigravity({ req, res, messages, modelKey, params });
-            }
-
-            res.write(
-                `data: ${JSON.stringify({
-                    type: 'error',
-                    code: 429,
-                    text: `All Antigravity accounts are rate-limited. Try again in ${retryAfter}s.`,
-                })}\n\n`,
-            );
-        } else if (status === 401) {
-            res.write(
-                `data: ${JSON.stringify({
-                    type: 'error',
-                    code: 401,
-                    text: 'Antigravity token expired. Re-authenticate in Settings → Google Antigravity.',
-                })}\n\n`,
-            );
-        } else if (status === 403) {
-            res.write(
-                `data: ${JSON.stringify({
-                    type: 'error',
-                    code: 403,
-                    text: 'Model not available or account restricted. Try a different model.',
-                })}\n\n`,
-            );
-        } else {
-            const msg = lastError?.message || 'Unknown Antigravity error';
-            res.write(`data: ${JSON.stringify({ type: 'error', code: status || 500, text: msg })}\n\n`);
-        }
-        res.end();
-        return;
-    }
-
-    req.on('close', () => {
-        response.data.destroy();
-    });
-
-    response.data.on('data', (chunk) => {
-        const lines = chunk.toString().split('\n');
-        for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-
-            const payload = line.slice(6).trim();
-            if (payload === '[DONE]') {
-                res.write('data: [DONE]\n\n');
-                return;
-            }
-
-            try {
-                const parsed = JSON.parse(payload);
-                const parts = parsed.candidates?.[0]?.content?.parts || [];
-
-                for (const part of parts) {
-                    if (typeof part?.text !== 'string' || !part.text) continue;
-
-                    if (part.thought === true) {
-                        res.write(`data: ${JSON.stringify({ type: 'reasoning', text: part.text })}\n\n`);
-                    } else {
-                        res.write(`data: ${JSON.stringify({ type: 'content', text: part.text })}\n\n`);
-                    }
-                }
-
-                const finishReason = parsed.candidates?.[0]?.finishReason;
-                if (finishReason === 'STOP' || finishReason === 'MAX_TOKENS') {
-                    res.write('data: [DONE]\n\n');
-                }
-            } catch {
-                // Skip malformed chunks
-            }
-        }
-    });
-
-    response.data.on('end', () => {
-        res.write('data: [DONE]\n\n');
-        res.end();
-
-        // Background quota refresh
-        if (shouldRefreshQuota(account)) {
-            refreshQuota(account).catch(() => {});
-        }
-    });
-
-    response.data.on('error', (err) => {
-        console.error('[antigravity] Stream error:', err.message);
-        regenerateFingerprint(account.email);
-        res.write(`data: ${JSON.stringify({ type: 'error', text: 'Stream interrupted.' })}\n\n`);
-        res.end();
-    });
 }
 
 // ── Helper Functions ──
