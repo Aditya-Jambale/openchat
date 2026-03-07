@@ -546,8 +546,3 @@ export default async (req) => {
     });
 };
 
-// Netlify Functions v2 config — must be exported as a named `config`.
-export const config = {
-    path: '/api/chat',
-    method: 'POST',
-};
