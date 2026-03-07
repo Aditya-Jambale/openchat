@@ -223,7 +223,7 @@ async function* streamCerebras(messages, params, modelId, clientKey, signal) {
 }
 
 async function* streamGitHubModels(messages, params, modelId, clientKey, signal) {
-    const githubModelsToken = process.env.GITHUB_MODELS_TOKEN || clientKey;
+    const githubModelsToken = getGitHubModelsToken() || normalizeSecret(clientKey);
     if (!githubModelsToken || !githubModelsToken.startsWith('github_pat_')) {
         yield sseError(401, 'Invalid GitHub Models token. Provide a fine-grained GitHub PAT for Models.');
         return;
@@ -485,6 +485,27 @@ async function readJsonSafe(res) {
     } catch {
         return null;
     }
+}
+
+function normalizeSecret(value) {
+    if (typeof value !== 'string') return '';
+    return value.trim().replace(/^['"]+|['"]+$/g, '').trim();
+}
+
+function getGitHubModelsToken() {
+    const candidates = [
+        process.env.GITHUB_MODELS_TOKEN,
+        process.env.GITHUB_TOKEN,
+        process.env.GH_TOKEN,
+        process.env.GITHUB_PAT,
+    ];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeSecret(candidate);
+        if (normalized) return normalized;
+    }
+
+    return '';
 }
 
 // ── Helpers ─────────────────────────────────────

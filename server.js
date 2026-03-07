@@ -271,7 +271,7 @@ app.get('/api/models/google', async (_req, res) => {
 });
 
 app.get('/api/models/github', async (_req, res) => {
-    const githubModelsToken = process.env.GITHUB_MODELS_TOKEN?.trim();
+    const githubModelsToken = getGitHubModelsToken();
 
     if (!githubModelsToken) {
         return res.status(500).json({
@@ -417,7 +417,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     if (provider === 'github') {
-        const apiKey = process.env.GITHUB_MODELS_TOKEN || clientKey;
+        const apiKey = getGitHubModelsToken() || normalizeSecret(clientKey);
         if (!apiKey || !apiKey.startsWith('github_pat_')) {
             return res.status(401).json({
                 error: {
@@ -667,7 +667,7 @@ async function streamGoogle({ req, res, messages, modelId, params = {}, systemPr
 }
 
 async function streamGitHubModels({ req, res, messages, modelId, clientKey, params = {} }) {
-    const githubModelsToken = process.env.GITHUB_MODELS_TOKEN || clientKey;
+    const githubModelsToken = getGitHubModelsToken() || normalizeSecret(clientKey);
 
     if (!githubModelsToken) {
         res.write(
@@ -1535,6 +1535,29 @@ function getContentText(content) {
 function getReasoningText(delta) {
     if (typeof delta?.reasoning === 'string') return delta.reasoning;
     if (typeof delta?.reasoning_content === 'string') return delta.reasoning_content;
+    return '';
+}
+
+function normalizeSecret(value) {
+    if (typeof value !== 'string') return '';
+    return value.trim().replace(/^['"]+|['"]+$/g, '').trim();
+}
+
+function getGitHubModelsToken() {
+    const candidates = [
+        process.env.GITHUB_MODELS_TOKEN,
+        process.env.GITHUB_TOKEN,
+        process.env.GH_TOKEN,
+        process.env.GITHUB_PAT,
+    ];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeSecret(candidate);
+        if (normalized) {
+            return normalized;
+        }
+    }
+
     return '';
 }
 
