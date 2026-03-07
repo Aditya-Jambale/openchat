@@ -16,6 +16,7 @@ import {
 // ── Config ──────────────────────────────────────
 const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const NVIDIA_MODEL_ID = 'moonshotai/kimi-k2.5';
+const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
 const GOOGLE_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -148,6 +149,74 @@ async function* streamGoogle(messages, params, systemPrompt, modelId, signal) {
                 events.push(sseEvent({ type: 'content', text: part.text }));
             }
         }
+        return events;
+    });
+}
+
+async function* streamCerebras(messages, params, modelId, clientKey, signal) {
+    const cerebrasApiKey = process.env.CEREBRAS_API_KEY || clientKey;
+    if (!cerebrasApiKey || !cerebrasApiKey.startsWith('csk-')) {
+        yield sseError(401, 'Invalid Cerebras API key. Key must start with "csk-".');
+        return;
+    }
+
+    const payload = {
+        model: modelId,
+        messages,
+        stream: true,
+    };
+    if (params.temperature != null) payload.temperature = params.temperature;
+    if (params.top_p != null) payload.top_p = params.top_p;
+    if (params.max_tokens != null) payload.max_tokens = params.max_tokens;
+    if (params.frequency_penalty != null) payload.frequency_penalty = params.frequency_penalty;
+    if (params.presence_penalty != null) payload.presence_penalty = params.presence_penalty;
+
+    let res;
+    try {
+        res = await fetch(CEREBRAS_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${cerebrasApiKey}`,
+                'Content-Type': 'application/json',
+                Accept: 'text/event-stream',
+            },
+            body: JSON.stringify(payload),
+            signal,
+        });
+    } catch (err) {
+        yield sseError(500, err.message || 'Connection to Cerebras failed.');
+        return;
+    }
+
+    if (!res.ok) {
+        const status = res.status;
+        const errorData = await readJsonSafe(res);
+        const message =
+            errorData?.error?.message ||
+            errorData?.message ||
+            errorData?.detail ||
+            `Cerebras API error (HTTP ${status})`;
+
+        if (status === 401 || status === 403) yield sseError(status, 'Cerebras API key is invalid or lacks access to the requested model.');
+        else if (status === 404) yield sseError(404, message);
+        else if (status === 429) yield sseError(429, 'Cerebras rate limit exceeded. Please wait and try again.');
+        else yield sseError(status, message);
+        return;
+    }
+
+    yield* parseUpstreamSSE(res, (parsed) => {
+        const events = [];
+
+        if (parsed.error?.message) {
+            events.push(sseError(parsed.error?.code || 500, parsed.error.message));
+            return events;
+        }
+
+        const delta = parsed.choices?.[0]?.delta || {};
+        const reasoning = getReasoningText(delta);
+        const content = getContentText(delta.content);
+        if (reasoning) events.push(sseEvent({ type: 'reasoning', text: reasoning }));
+        if (content) events.push(sseEvent({ type: 'content', text: content }));
         return events;
     });
 }
@@ -342,6 +411,14 @@ async function* parseUpstreamSSE(res, extract) {
     yield sseDone();
 }
 
+async function readJsonSafe(res) {
+    try {
+        return await res.json();
+    } catch {
+        return null;
+    }
+}
+
 // ── Helpers ─────────────────────────────────────
 
 function getContentText(content) {
@@ -470,7 +547,7 @@ export default async (req) => {
         );
     }
 
-    const validProviders = ['nvidia', 'bedrock', 'openrouter', 'google'];
+    const validProviders = ['nvidia', 'bedrock', 'openrouter', 'google', 'cerebras'];
     if (!validProviders.includes(provider)) {
         return new Response(
             JSON.stringify({ error: { code: 'BAD_REQUEST', message: `Invalid provider: "${provider}".` } }),
@@ -511,6 +588,9 @@ export default async (req) => {
                         break;
                     case 'google':
                         gen = streamGoogle(messages, params, system_prompt, modelId, abortController.signal);
+                        break;
+                    case 'cerebras':
+                        gen = streamCerebras(messages, params, modelId, clientKey, abortController.signal);
                         break;
                     case 'bedrock':
                         gen = streamBedrock(messages, params, modelId, region, abortController.signal);
