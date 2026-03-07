@@ -3,6 +3,7 @@ import cors from 'cors';
 import axios from 'axios';
 import https from 'https';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import {
     BedrockRuntimeClient,
     ConverseStreamCommand,
@@ -1300,7 +1301,16 @@ app.get('/api/antigravity/status', (req, res) => {
     });
 });
 
-app.post('/api/antigravity/auth/start', async (req, res) => {
+// Rate limiter for Antigravity OAuth endpoints — max 5 auth attempts per minute per IP
+const antigravityAuthRateLimit = rateLimit({
+    windowMs: 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: { code: 'RATE_LIMITED', message: 'Too many authentication attempts. Please wait a moment.' } },
+});
+
+app.post('/api/antigravity/auth/start', antigravityAuthRateLimit, async (req, res) => {
     try {
         const tokenData = await startOAuthFlow();
         addAccount(tokenData);
@@ -1316,7 +1326,7 @@ app.post('/api/antigravity/auth/start', async (req, res) => {
     }
 });
 
-app.post('/api/antigravity/auth/add', async (req, res) => {
+app.post('/api/antigravity/auth/add', antigravityAuthRateLimit, async (req, res) => {
     try {
         const tokenData = await startOAuthFlow();
         addAccount(tokenData);

@@ -17,6 +17,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.3.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.33",
     "marked": "^15.0.6",

@@ -675,7 +675,10 @@ async function init() {
         if (connectBtn) connectBtn.disabled = true;
         if (addBtn) addBtn.disabled = true;
         if (progressDiv) progressDiv.style.display = '';
-        if (noAccountsDiv) noAccountsDiv.querySelector('p') && (noAccountsDiv.querySelector('p').style.display = 'none');
+        if (noAccountsDiv) {
+            const hint = noAccountsDiv.querySelector('p');
+            if (hint) hint.style.display = 'none';
+        }
 
         try {
             const res = await fetch('/api/antigravity/auth/start', { method: 'POST' });

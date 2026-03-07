@@ -15,6 +15,26 @@ import {
 } from './constants.js';
 
 /**
+ * Build the authorization URL params for the Google OAuth flow.
+ */
+function buildAuthParams({ clientId, redirectUri, scopes, state, codeChallenge }) {
+    const params = {
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: scopes.join(' '),
+        state,
+        access_type: 'offline',
+        prompt: 'consent',
+    };
+    if (codeChallenge) {
+        params.code_challenge = codeChallenge;
+        params.code_challenge_method = 'S256';
+    }
+    return new URLSearchParams(params);
+}
+
+/**
  * Start the OAuth 2.0 PKCE flow and return tokens + email + project_id.
  * Opens the user's browser for Google login, waits for the callback.
  */
@@ -22,22 +42,17 @@ export async function startOAuthFlow() {
     const { code_verifier, code_challenge } = await pkceChallenge();
     const state = generateState();
 
-    const params = new URLSearchParams({
-        client_id: OAUTH_CLIENT_ID,
-        redirect_uri: OAUTH_REDIRECT_URI,
-        response_type: 'code',
-        scope: OAUTH_SCOPES.join(' '),
-        code_challenge,
-        code_challenge_method: 'S256',
+    const authUrl = `${OAUTH_AUTH_URL}?${buildAuthParams({
+        clientId: OAUTH_CLIENT_ID,
+        redirectUri: OAUTH_REDIRECT_URI,
+        scopes: OAUTH_SCOPES,
         state,
-        access_type: 'offline',
-        prompt: 'consent',
-    });
+        codeChallenge: code_challenge,
+    }).toString()}`;
 
-    const authUrl = `${OAUTH_AUTH_URL}?${params.toString()}`;
-
-    // Start temporary callback server and wait for the auth code
-    const { code: authCode, state: returnedState } = await startCallbackServer(state);
+    // Start temporary callback server and wait for the auth code.
+    // Pass the full authUrl so the callback server opens it in the browser.
+    const { code: authCode, state: returnedState } = await startCallbackServer(state, authUrl);
 
     if (returnedState !== state) {
         throw new Error('OAuth state mismatch — possible CSRF attack');
@@ -144,8 +159,10 @@ export async function getProjectId(accessToken) {
         }
     }
 
-    // Last resort: generate a local placeholder
-    return `openchat-${Date.now()}`;
+    throw new Error(
+        'Could not find or create a Google Cloud project for this account. ' +
+        'Ensure the account has access to Google Cloud or create a project at console.cloud.google.com.',
+    );
 }
 
 // ── Helpers ──
@@ -156,7 +173,7 @@ function generateState() {
     return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function startCallbackServer(expectedState) {
+function startCallbackServer(expectedState, authUrl) {
     return new Promise((resolve, reject) => {
         const app = express();
         const server = createServer(app);
@@ -196,17 +213,8 @@ function startCallbackServer(expectedState) {
         });
 
         server.listen(OAUTH_REDIRECT_PORT, () => {
-            // Open browser after server is ready
-            const params = new URLSearchParams({
-                client_id: OAUTH_CLIENT_ID,
-                redirect_uri: OAUTH_REDIRECT_URI,
-                response_type: 'code',
-                scope: OAUTH_SCOPES.join(' '),
-                state: expectedState,
-                access_type: 'offline',
-                prompt: 'consent',
-            });
-            open(`${OAUTH_AUTH_URL}?${params.toString()}`).catch(() => {});
+            // Open the pre-built auth URL in the user's browser
+            open(authUrl).catch(() => {});
         });
 
         server.on('error', (err) => {

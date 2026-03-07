@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { ACCOUNTS_FILE } from './constants.js';
 import { generateFingerprint, buildFingerprintHeaders } from './fingerprint.js';
 import { refreshAccessToken } from './oauth.js';
@@ -32,7 +33,7 @@ export function saveAccounts(store) {
         fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     }
 
-    const tmp = `${ACCOUNTS_FILE}.tmp.${process.pid}`;
+    const tmp = `${ACCOUNTS_FILE}.tmp.${crypto.randomUUID()}`;
     try {
         fs.writeFileSync(tmp, JSON.stringify(store, null, 2), { mode: 0o600 });
         fs.renameSync(tmp, ACCOUNTS_FILE);
