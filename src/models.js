@@ -89,6 +89,19 @@ export const CEREBRAS_GLM_MODEL = Object.freeze({
     featured: true,
 });
 
+export const CEREBRAS_GPT_OSS_MODEL = Object.freeze({
+    key: 'cerebras::gpt-oss-120b',
+    id: 'gpt-oss-120b',
+    provider: 'cerebras',
+    companyKey: 'openai',
+    name: 'GPT-OSS 120B',
+    description: 'OpenAI OSS model served through Cerebras Inference.',
+    contextWindow: 131072,
+    supportsVision: false,
+    supportsThinking: true,
+    featured: true,
+});
+
 const DEEPSEEK_MODELS = [
     {
         id: 'us.deepseek.r1-v1:0',
@@ -423,6 +436,7 @@ export function getAllModels() {
         decorateModel(OPENROUTER_AUTO_MODEL),
         decorateModel(NVIDIA_KIMI_MODEL),
         decorateModel(CEREBRAS_GLM_MODEL),
+        decorateModel(CEREBRAS_GPT_OSS_MODEL),
         ...DEEPSEEK_MODELS.map(bedrockModel),
         ...NOVA_MODELS.map(bedrockModel),
         ...LLAMA_MODELS.map(bedrockModel),
