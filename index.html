@@ -21,13 +21,17 @@
   <link rel="stylesheet" href="/src/styles/chat.css" />
   <link rel="stylesheet" href="/src/styles/modal.css" />
   <link rel="stylesheet" href="/src/styles/settings.css" />
+  <link rel="stylesheet" href="/src/styles/auth.css" />
 </head>
 
 <body>
   <!-- Grain overlay -->
   <div class="grain-overlay" aria-hidden="true"></div>
 
-  <div class="app-layout">
+  <!-- ═══════ AUTH SCREEN ═══════ -->
+  <div id="auth-screen"></div>
+
+  <div class="app-layout" id="app-layout">
     <!-- ═══════ SIDEBAR ═══════ -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
@@ -60,6 +64,7 @@
       </div>
 
       <div class="sidebar-footer">
+        <div id="sidebar-user" class="hidden"></div>
         <button class="btn-settings" id="btn-settings" title="API key settings">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">

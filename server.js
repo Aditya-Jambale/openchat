@@ -290,7 +290,7 @@ app.get('/api/models/github', async (_req, res) => {
                 'X-GitHub-Api-Version': '2022-11-28',
             },
             timeout: 20000,
-            httpsAgent: keepAliveAgent,
+            httpsAgent: false,
         });
 
         const models = Array.isArray(response.data) ? response.data : [];

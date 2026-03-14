@@ -67,9 +67,12 @@ export async function getChats() {
  * Create a new chat row.
  */
 export async function createChat(chat) {
+    const row = { id: chat.id, title: chat.title };
+    if (chat.user_id) row.user_id = chat.user_id;
+
     const { data, error } = await supabase
         .from('chats')
-        .insert({ id: chat.id, title: chat.title })
+        .insert(row)
         .select()
         .single();
 

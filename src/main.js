@@ -1,4 +1,6 @@
 import { fetchFreeOpenRouterModels, fetchGitHubModels, fetchGoogleModels } from './api.js';
+import { initAuth, onAuthStateChange } from './auth.js';
+import { initAuthUI, renderUserInfo } from './auth-ui.js';
 import { COMPANY_ORDER, getAllModels, withModelKey } from './models.js';
 import { getApiKey, setApiKey, getSelectedModelId, setSelectedModelId, getAwsRegion, setAwsRegion } from './storage.js';
 import {
@@ -668,4 +670,44 @@ async function loadAvailableModels() {
     return sortModels(uniqueModels([...staticModels, ...dynamicModels]));
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// ── Auth-gated bootstrap ──
+let appInitialized = false;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const authUI = initAuthUI();
+    const appLayout = document.getElementById('app-layout');
+
+    // Check existing session
+    const existingUser = await initAuth();
+
+    if (existingUser) {
+        authUI?.hide();
+        appLayout?.classList.remove('hidden');
+        if (!appInitialized) {
+            appInitialized = true;
+            await init();
+        }
+        renderUserInfo(existingUser);
+    } else {
+        appLayout?.classList.add('hidden');
+        authUI?.show();
+    }
+
+    // Listen for future auth state changes (login / logout)
+    onAuthStateChange(async (user) => {
+        if (user) {
+            authUI?.hide();
+            appLayout?.classList.remove('hidden');
+            if (!appInitialized) {
+                appInitialized = true;
+                await init();
+            }
+            renderUserInfo(user);
+        } else {
+            appLayout?.classList.add('hidden');
+            authUI?.show();
+            renderUserInfo(null);
+            appInitialized = false;
+        }
+    });
+});

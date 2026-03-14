@@ -1,4 +1,5 @@
 import { streamChat } from './api.js';
+import { getCurrentUser } from './auth.js';
 import { getModelParams, getSystemPrompt } from './settings.js';
 import { renderMarkdown, attachCopyHandlers } from './markdown.js';
 import {
@@ -76,8 +77,9 @@ export async function newChat() {
     currentChat = { id, title: 'New chat', messages: [] };
     setCurrentChatId(id);
 
-    // Insert into Supabase
-    await createChat({ id, title: 'New chat' });
+    // Insert into Supabase with user_id for RLS
+    const user = await getCurrentUser();
+    await createChat({ id, title: 'New chat', user_id: user?.id });
 
     // Clear context cache for previous chat.
     clearChatCache(id);
